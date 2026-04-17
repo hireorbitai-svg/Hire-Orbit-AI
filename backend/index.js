@@ -1438,7 +1438,9 @@ app.post("/api/career-suggestions", authenticate, async (req, res) => {
   }
 });
 
+const PORT = process.env.PORT || 5001;
+
 // Server startup
-app.listen(5001, "0.0.0.0", () => {
-  console.log("Server running on http://localhost:5001");
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`Server running on port ${PORT}`);
 });
