@@ -454,7 +454,7 @@ export default function Dashboard() {
 
             <CareerSuggestions suggestions={suggestions} />
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div id="analytics" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 scroll-mt-24">
               <MatchScoreCard matchScore={dashboardMatchScore} />
               <AIInsightCard
                 insight={data.aiInsight}

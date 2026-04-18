@@ -31,7 +31,7 @@ const mainNavItems: NavItem[] = [
   { id: 'resume', label: 'Resume', icon: FileText, href: '/onboarding' },
   { id: 'jobs', label: 'Jobs', icon: Briefcase, badge: 4, href: '/dashboard#jobs' },
   { id: 'companies', label: 'Companies', icon: Building2, href: '/companies' },
-  { id: 'analytics', label: 'Analytics', icon: BarChart3, href: '/dashboard' },
+  { id: 'analytics', label: 'Analytics', icon: BarChart3, href: '/dashboard#analytics' },
 ];
 
 const bottomNavItems: NavItem[] = [
