@@ -233,22 +233,28 @@ export default function Dashboard() {
           }
         }
 
-        // ✅ Fix: skills may be nested inside resumeData depending on backend version
-        const resolvedSkills = analysisData.skills?.length > 0
-          ? analysisData.skills
-          : (analysisData.resumeData?.skills || profileData?.skills || []);
+        // ✅ Always prefer Supabase persisted profile data (survives Railway restarts)
+        // Backend in-memory result (analysisData) is secondary — it's lost on every restart
+        const resolvedSkills =
+          (profileData?.skills?.length > 0 ? profileData.skills : null) ||
+          (analysisData.skills?.length > 0 ? analysisData.skills : null) ||
+          analysisData.resumeData?.skills ||
+          [];
 
-        const resolvedRole = analysisData.role && analysisData.role !== 'Unknown'
-          ? analysisData.role
-          : (analysisData.resumeData?.role || profileData?.role || 'Unknown');
+        const resolvedRole =
+          (profileData?.role && profileData.role !== 'Unknown' ? profileData.role : null) ||
+          (analysisData.role && analysisData.role !== 'Unknown' ? analysisData.role : null) ||
+          analysisData.resumeData?.role ||
+          'Professional'; // better default than 'Unknown' for SerpAPI query
+
+        console.log("✅ Resolved skills:", resolvedSkills?.slice(0, 4), "| Role:", resolvedRole);
 
         let jSearchJobs = [];
         try {
-          console.log("PROFILE SKILLS:", resolvedSkills);
           // ✅ Pass role so SerpAPI queries Google Jobs with the correct title
           const jobParams = new URLSearchParams();
           if ((resolvedSkills || []).length > 0) jobParams.set("skills", resolvedSkills.join(","));
-          if (resolvedRole && resolvedRole !== 'Unknown') jobParams.set("role", resolvedRole);
+          jobParams.set("role", resolvedRole); // always send role (never skip it)
 
           const jobRes = await fetch(`/api/jobs?${jobParams.toString()}`);
           if (jobRes.ok) {
