@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { TrendingUp, Sparkles, Target } from 'lucide-react';
 import { getGreeting } from '@/lib/mock-data';
@@ -12,7 +13,11 @@ interface HeroSectionProps {
 }
 
 export function HeroSection({ profile, matchScore, jobCount = 0 }: HeroSectionProps) {
-  const greeting = getGreeting();
+  const [greeting, setGreeting] = useState('Welcome');
+
+  useEffect(() => {
+    setGreeting(getGreeting());
+  }, []);
 
   return (
     <motion.section
