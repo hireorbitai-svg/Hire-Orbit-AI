@@ -338,6 +338,7 @@ export default function Dashboard() {
         setData({
           ...profileData,
           ...analysisData,
+          email: user?.email || profileData?.email,
           skills: resolvedSkills,
           role: resolvedRole,
           jobs: finalJobs,
@@ -417,6 +418,7 @@ export default function Dashboard() {
   // Transform internal state to component props
   const dashboardUser = {
     name: data?.name || data?.full_name || "User",
+    email: data?.email || "No email provided",
     role: data?.role || "Unknown",
     skills: data?.skills || [],
     experience: data?.experience || "",
