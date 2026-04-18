@@ -1444,6 +1444,66 @@ app.post("/api/career-suggestions", authenticate, async (req, res) => {
   }
 });
 
+
+// 🧠 AI Insight — powered by Google Gemma via Gemini API
+app.post("/api/ai-insight", authenticate, async (req, res) => {
+  try {
+    const { skills = [], role = "Professional", topMissingSkills = [], matchScore = 0 } = req.body;
+
+    const GEMINI_KEY = process.env.GEMINI_API_KEY;
+    if (!GEMINI_KEY) {
+      return res.status(500).json({ error: "Gemini API key not configured" });
+    }
+
+    const prompt = `You are an expert career coach AI. Analyze this professional profile and provide highly personalized, actionable career insights.
+
+Profile:
+- Current Role: ${role}
+- Skills: ${skills.slice(0, 15).join(", ")}
+- Average Job Match Score: ${matchScore}%
+- Top Missing Skills (from job listings): ${topMissingSkills.slice(0, 5).join(", ") || "None identified"}
+
+Respond ONLY with a JSON object in this exact format:
+{
+  "summary": "2-3 sentence personalized career insight mentioning their strongest skill and biggest opportunity",
+  "strengths": ["strength1", "strength2", "strength3"],
+  "gaps": ["gap1", "gap2", "gap3"],
+  "quickWins": [
+    { "action": "specific action", "impact": "+X% match boost", "timeframe": "1-2 weeks" },
+    { "action": "specific action", "impact": "+X% match boost", "timeframe": "2-4 weeks" }
+  ],
+  "careerPath": "1-2 sentence description of ideal next career move",
+  "salaryInsight": "salary range insight for their role in India"
+}`;
+
+    const geminiRes = await axios.post(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemma-3-27b-it:generateContent?key=${GEMINI_KEY}`,
+      {
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: { temperature: 0.7, maxOutputTokens: 1024 }
+      },
+      { headers: { "Content-Type": "application/json" }, timeout: 30000 }
+    );
+
+    let rawText = geminiRes.data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
+    rawText = rawText.replace(/```json|```/g, "").trim();
+
+    const insight = safeJSONParse(rawText, {
+      summary: `You have strong ${skills[0] || "professional"} skills. Focus on ${topMissingSkills[0] || "expanding your skillset"} to unlock more opportunities.`,
+      strengths: skills.slice(0, 3),
+      gaps: topMissingSkills.slice(0, 3),
+      quickWins: [{ action: `Learn ${topMissingSkills[0] || "a new skill"}`, impact: "+15% match boost", timeframe: "2-4 weeks" }],
+      careerPath: `Continue growing as a ${role} with focus on emerging technologies.`,
+      salaryInsight: "Competitive salary range based on your experience level."
+    });
+
+    res.json({ success: true, insight });
+  } catch (err) {
+    console.error("Gemma AI Insight error:", err.response?.data || err.message);
+    res.status(500).json({ error: "AI insight generation failed" });
+  }
+});
+
 const PORT = process.env.PORT || 5001;
 
 // Server startup

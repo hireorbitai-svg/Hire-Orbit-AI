@@ -449,7 +449,13 @@ export default function Dashboard() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               <MatchScoreCard matchScore={dashboardMatchScore} />
-              <AIInsightCard insight={data.aiInsight} />
+              <AIInsightCard
+                insight={data.aiInsight}
+                skills={data.skills || []}
+                role={data.role || 'Professional'}
+                matchScore={dashboardMatchScore.score}
+                topMissingSkills={data.improvements?.map((imp: any) => imp.title?.replace('Strengthen ', '').replace('Get ', '').split(' ')[0]).filter(Boolean) || []}
+              />
               <SkillsRadar skills={dashboardSkills.length > 0 ? dashboardSkills : mockDashboardData.skills} />
             </div>
 
