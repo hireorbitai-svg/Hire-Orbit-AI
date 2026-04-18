@@ -1612,4 +1612,7 @@ app.listen(PORT, "0.0.0.0", () => {
   console.log(`🔑 GEMINI_API_KEY: ${process.env.GEMINI_API_KEY ? "SET ✅" : "MISSING ❌"}`);
   console.log(`🔑 JWT_SECRET: ${process.env.JWT_SECRET ? "SET ✅" : "MISSING ❌"}`);
   console.log(`🔑 RESEND_API_KEY: ${process.env.RESEND_API_KEY ? "SET ✅" : "MISSING ❌"}`);
+  console.log(`🔑 SUPABASE_URL: ${process.env.SUPABASE_URL ? "SET ✅" : "MISSING ❌"}`);
+  console.log(`🔑 SUPABASE_SERVICE_ROLE_KEY: ${process.env.SUPABASE_SERVICE_ROLE_KEY ? "SET ✅" : "MISSING ❌"}`);
+  console.log(`🔑 SERPAPI_KEY: ${process.env.SERPAPI_KEY ? "SET ✅" : "MISSING ❌"}`);
 });
