@@ -13,6 +13,7 @@ import {
   Orbit,
   Menu,
   X,
+  Building2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
@@ -29,6 +30,7 @@ const mainNavItems: NavItem[] = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, href: '/dashboard' },
   { id: 'resume', label: 'Resume', icon: FileText, href: '/onboarding' },
   { id: 'jobs', label: 'Jobs', icon: Briefcase, badge: 4, href: '/dashboard' },
+  { id: 'companies', label: 'Companies', icon: Building2, href: '/companies' },
   { id: 'analytics', label: 'Analytics', icon: BarChart3, href: '/dashboard' },
 ];
 

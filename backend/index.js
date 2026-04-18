@@ -1469,7 +1469,67 @@ app.post("/api/career-suggestions", authenticate, async (req, res) => {
 });
 
 
-// 🧠 AI Insight — powered by Google Gemma via Gemini API
+// 🏢 Company Jobs — fetch live Google Jobs for a specific company
+const companyJobsCache = new Map(); // company → { jobs, cachedAt }
+const COMPANY_CACHE_TTL = 30 * 60 * 1000; // 30 minutes
+
+app.get("/api/company-jobs", async (req, res) => {
+  try {
+    const { company, location = "India" } = req.query;
+    if (!company) return res.status(400).json({ error: "company parameter required" });
+
+    const cacheKey = `${company.toLowerCase()}-${location}`;
+    const cached = companyJobsCache.get(cacheKey);
+    if (cached && Date.now() - cached.cachedAt < COMPANY_CACHE_TTL) {
+      console.log(`📦 Company jobs cache hit: ${company}`);
+      return res.json({ jobs: cached.jobs, source: "cache" });
+    }
+
+    const query = `${company} jobs`;
+    console.log(`🌐 SerpAPI company jobs → "${query}"`);
+
+    const response = await axios.get("https://serpapi.com/search.json", {
+      params: {
+        engine: "google_jobs",
+        q: query,
+        location,
+        hl: "en",
+        gl: "in",
+        chips: "date_posted:month",
+        api_key: process.env.SERPAPI_KEY,
+      },
+      timeout: 10000,
+    });
+
+    const rawJobs = response.data.jobs_results || [];
+    const jobs = rawJobs.map((job, i) => {
+      const ext = job.detected_extensions || {};
+      const salary = ext.salary
+        || job.extensions?.find(e => e.includes("₹") || e.toLowerCase().includes("lpa") || e.toLowerCase().includes("month"))
+        || "Competitive";
+      return {
+        id: job.job_id || `cj-${i}`,
+        title: job.title || "Job Opening",
+        company: job.company_name || company,
+        location: job.location || location,
+        salary,
+        postedAt: ext.posted_at || job.extensions?.[0] || "Recently",
+        type: ext.schedule_type || job.extensions?.find(e => ["Full-time", "Part-time", "Contract", "Internship"].includes(e)) || "Full-time",
+        description: job.description?.slice(0, 200) + "..." || "",
+        applyLink: job.related_links?.[0]?.link || job.apply_options?.[0]?.link || `https://www.google.com/search?q=${encodeURIComponent(job.title + " " + company)}`,
+        thumbnail: job.thumbnail || null,
+      };
+    });
+
+    companyJobsCache.set(cacheKey, { jobs, cachedAt: Date.now() });
+    res.json({ jobs, source: "live", total: jobs.length });
+  } catch (err) {
+    console.error("Company jobs error:", err.response?.data?.error || err.message);
+    res.json({ jobs: [], source: "error", error: err.message });
+  }
+});
+
+
 app.post("/api/ai-insight", authenticate, async (req, res) => {
   try {
     const { skills = [], role = "Professional", topMissingSkills = [], matchScore = 0 } = req.body;
