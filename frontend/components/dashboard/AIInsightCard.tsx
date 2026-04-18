@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Brain, ArrowRight, Lightbulb, Sparkles, X,
-  TrendingUp, Target, Zap, IndianRupee, ChevronRight, Loader2
+  TrendingUp, Target, Zap, IndianRupee, ChevronRight,
+  CheckCircle2, Star, Rocket, Trophy, Clock, AlertCircle
 } from 'lucide-react';
 import type { AIInsight } from '@/lib/types';
 import { Button } from '@/components/ui/button';
@@ -27,37 +28,35 @@ interface GemmaInsight {
   salaryInsight: string;
 }
 
+const LOADING_PHRASES = [
+  "Scanning your skill profile...",
+  "Analyzing market trends...",
+  "Identifying growth opportunities...",
+  "Crafting personalized insights...",
+  "Finalizing your career roadmap...",
+];
+
 export function AIInsightCard({ insight, skills = [], role = 'Professional', matchScore = 0, topMissingSkills = [] }: AIInsightCardProps) {
   const [isHovered, setIsHovered] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [gemmaInsight, setGemmaInsight] = useState<GemmaInsight | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [loadingPhrase, setLoadingPhrase] = useState(0);
+  const [activeSection, setActiveSection] = useState<string>('summary');
   const supabase = getSupabaseClient();
 
-  const renderHighlightedMessage = (message: string, keywords: string[]) => {
-    if (!keywords || keywords.length === 0) return message;
-    const regex = new RegExp(`(${keywords.map(k => k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})`, 'gi');
-    const parts = message.split(regex);
-    return parts.map((part, index) => {
-      const isKeyword = keywords.some(k => k.toLowerCase() === part.toLowerCase());
-      if (isKeyword) {
-        return (
-          <motion.span
-            key={index}
-            initial={{ opacity: 0.8 }}
-            animate={{ opacity: 1, scale: isHovered ? 1.05 : 1 }}
-            className="inline-block px-2 py-0.5 mx-0.5 rounded-md bg-emerald-500/20 text-emerald-400 font-semibold border border-emerald-500/30"
-          >{part}</motion.span>
-        );
-      }
-      return <span key={index}>{part}</span>;
-    });
-  };
+  useEffect(() => {
+    if (!loading) return;
+    const interval = setInterval(() => {
+      setLoadingPhrase(p => (p + 1) % LOADING_PHRASES.length);
+    }, 1800);
+    return () => clearInterval(interval);
+  }, [loading]);
 
   const openModal = async () => {
     setModalOpen(true);
-    if (gemmaInsight) return; // already loaded
+    if (gemmaInsight) return;
     setLoading(true);
     setError('');
     try {
@@ -76,19 +75,28 @@ export function AIInsightCard({ insight, skills = [], role = 'Professional', mat
       const data = await res.json();
       if (data.success && data.insight) {
         setGemmaInsight(data.insight);
+        setActiveSection('summary');
       } else {
         setError(data.error || 'Failed to generate insight.');
       }
-    } catch (err) {
+    } catch {
       setError('Could not connect to AI service.');
     } finally {
       setLoading(false);
     }
   };
 
+  const sections = [
+    { id: 'summary', label: 'Overview', icon: Sparkles },
+    { id: 'strengths', label: 'Strengths', icon: Trophy },
+    { id: 'gaps', label: 'Skill Gaps', icon: Target },
+    { id: 'quickwins', label: 'Quick Wins', icon: Zap },
+    { id: 'career', label: 'Career & Salary', icon: TrendingUp },
+  ];
+
   return (
     <>
-      {/* Card */}
+      {/* ── Trigger Card ─────────────────────────────────────────────────── */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -98,84 +106,93 @@ export function AIInsightCard({ insight, skills = [], role = 'Professional', mat
         onClick={openModal}
         className="relative group cursor-pointer"
       >
+        {/* Glow */}
         <motion.div
-          animate={{ opacity: isHovered ? 0.5 : 0.2, scale: isHovered ? 1.02 : 1 }}
-          transition={{ duration: 0.3 }}
-          className="absolute inset-0 bg-gradient-to-br from-violet-500/20 via-emerald-500/10 to-teal-500/20 rounded-3xl blur-xl"
+          animate={{ opacity: isHovered ? 0.6 : 0.2, scale: isHovered ? 1.03 : 1 }}
+          transition={{ duration: 0.4 }}
+          className="absolute inset-0 bg-gradient-to-br from-violet-500/30 via-emerald-500/15 to-teal-500/25 rounded-3xl blur-xl"
         />
 
-        <div className="relative glass rounded-3xl p-6 h-full overflow-hidden border border-white/5 group-hover:border-emerald-500/20 transition-colors duration-300">
-          {/* Floating particles */}
-          <div className="absolute inset-0 overflow-hidden rounded-3xl pointer-events-none">
-            {[...Array(3)].map((_, i) => (
-              <motion.div
-                key={i}
-                className="absolute w-1 h-1 bg-emerald-400/40 rounded-full"
-                animate={{ y: [-20, -100], x: [0, (i - 1) * 20], opacity: [0, 1, 0] }}
-                transition={{ duration: 3 + i, repeat: Infinity, delay: i * 0.8, ease: 'easeOut' }}
-                style={{ left: `${30 + i * 25}%`, bottom: '0%' }}
-              />
-            ))}
-          </div>
+        <div className="relative glass rounded-3xl p-6 h-full overflow-hidden border border-white/5 group-hover:border-emerald-500/30 transition-all duration-500">
+          {/* Animated background grid */}
+          <div className="absolute inset-0 opacity-[0.02] rounded-3xl" style={{ backgroundImage: 'radial-gradient(circle at 2px 2px, white 1px, transparent 0)', backgroundSize: '24px 24px' }} />
+
+          {/* Floating orbs */}
+          <motion.div animate={{ y: [0, -8, 0], opacity: [0.3, 0.6, 0.3] }} transition={{ duration: 4, repeat: Infinity }} className="absolute top-4 right-4 w-16 h-16 bg-violet-500/20 rounded-full blur-xl" />
+          <motion.div animate={{ y: [0, 8, 0], opacity: [0.2, 0.5, 0.2] }} transition={{ duration: 3, repeat: Infinity, delay: 1 }} className="absolute bottom-4 left-4 w-12 h-12 bg-emerald-500/20 rounded-full blur-xl" />
 
           {/* Header */}
           <div className="flex items-center justify-between mb-5">
             <div className="flex items-center gap-3">
-              <motion.div animate={{ rotate: isHovered ? [0, -10, 10, 0] : 0 }} transition={{ duration: 0.5 }} className="relative">
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-emerald-500 flex items-center justify-center">
+              <div className="relative">
+                <motion.div
+                  animate={{ rotate: isHovered ? 360 : 0 }}
+                  transition={{ duration: 0.6 }}
+                  className="w-11 h-11 rounded-xl bg-gradient-to-br from-violet-500 to-emerald-500 flex items-center justify-center shadow-lg"
+                >
                   <Brain className="w-5 h-5 text-white" />
-                </div>
-                <motion.div animate={{ scale: [1, 1.2, 1], opacity: [0.5, 0.8, 0.5] }} transition={{ duration: 2, repeat: Infinity }} className="absolute inset-0 rounded-xl bg-violet-500/30 blur-md" />
-              </motion.div>
+                </motion.div>
+                <motion.div animate={{ scale: [1, 1.3, 1], opacity: [0.5, 1, 0.5] }} transition={{ duration: 2, repeat: Infinity }} className="absolute inset-0 rounded-xl bg-violet-500/40 blur-lg" />
+              </div>
               <div>
-                <h3 className="text-lg font-semibold text-white">{insight?.title || '🧠 AI Insight'}</h3>
-                <div className="flex items-center gap-1">
-                  <Sparkles className="w-3 h-3 text-emerald-400" />
-                  <span className="text-xs text-emerald-400">Powered by Gemma AI</span>
+                <h3 className="text-base font-bold text-white">{insight?.title || 'AI Career Intelligence'}</h3>
+                <div className="flex items-center gap-1.5 mt-0.5">
+                  <div className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse" />
+                  <span className="text-xs text-emerald-400 font-medium">Powered by Google Gemma</span>
                 </div>
               </div>
             </div>
-            <motion.div animate={{ rotate: isHovered ? 15 : 0 }} transition={{ duration: 0.3 }}>
-              <Lightbulb className="w-5 h-5 text-amber-400" />
+            <motion.div
+              animate={{ rotate: isHovered ? [0, -15, 15, 0] : 0, scale: isHovered ? 1.2 : 1 }}
+              transition={{ duration: 0.5 }}
+              className="w-9 h-9 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center"
+            >
+              <Lightbulb className="w-4 h-4 text-amber-400" />
             </motion.div>
           </div>
 
-          {/* Insight Message */}
-          <div className="mb-6">
-            <p className="text-zinc-300 leading-relaxed text-base">
-              {renderHighlightedMessage(insight?.message || 'Click to get your personalized AI career analysis', insight?.highlightedWords || [])}
-            </p>
+          {/* Score pill */}
+          {matchScore > 0 && (
+            <motion.div initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.4 }} className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-gradient-to-r from-emerald-500/10 to-teal-500/10 border border-emerald-500/20 mb-4">
+              <Star className="w-3 h-3 text-amber-400 fill-amber-400" />
+              <span className="text-xs font-semibold text-white">{matchScore}% avg. job match</span>
+              <Star className="w-3 h-3 text-amber-400 fill-amber-400" />
+            </motion.div>
+          )}
+
+          {/* Preview message */}
+          <p className="text-zinc-400 text-sm leading-relaxed mb-5 line-clamp-2">
+            {insight?.message || 'Get your personalised AI-powered career analysis with strengths, skill gaps, quick wins, and salary insights.'}
+          </p>
+
+          {/* Mini stats row */}
+          <div className="flex gap-2 mb-5">
+            {[
+              { label: 'Strengths', color: 'emerald' },
+              { label: 'Skill Gaps', color: 'amber' },
+              { label: 'Quick Wins', color: 'violet' },
+              { label: 'Salary', color: 'teal' },
+            ].map((item) => (
+              <div key={item.label} className={`flex-1 text-center py-1.5 rounded-xl bg-${item.color}-500/5 border border-${item.color}-500/20`}>
+                <span className={`text-[10px] font-semibold text-${item.color}-400 uppercase tracking-wide`}>{item.label}</span>
+              </div>
+            ))}
           </div>
 
-          {/* Action Card */}
-          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }} className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-emerald-500/10 to-teal-500/10 border border-emerald-500/20 p-4">
-            <div className="absolute top-0 right-0 w-20 h-20 bg-emerald-500/10 rounded-full blur-xl" />
-            <div className="relative flex items-start gap-3">
-              <div className="w-8 h-8 rounded-lg bg-emerald-500/20 flex items-center justify-center flex-shrink-0 mt-0.5">
-                <ArrowRight className="w-4 h-4 text-emerald-400" />
-              </div>
-              <div className="flex-1">
-                <p className="text-sm text-zinc-300 mb-1"><span className="text-white font-medium">Suggested Action:</span>{' '}{insight?.action || 'Click to view full AI analysis'}</p>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 font-semibold">{insight?.impact || 'Deep career insights'}</span>
-                </div>
-              </div>
-            </div>
-          </motion.div>
-
-          {/* CTA */}
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.6 }} className="mt-5">
-            <Button className="w-full bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-white font-medium py-5 rounded-xl transition-all duration-300 shadow-glow-sm hover:shadow-glow group/btn">
-              <span>Deep Analysis</span>
-              <motion.span animate={{ x: isHovered ? 5 : 0 }} transition={{ duration: 0.2 }}>
-                <ArrowRight className="w-4 h-4 ml-2 group-hover/btn:translate-x-1 transition-transform" />
+          {/* CTA Button */}
+          <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+            <div className="relative w-full py-3.5 rounded-2xl overflow-hidden bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 transition-all duration-300 shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2 font-semibold text-white text-sm">
+              <Rocket className="w-4 h-4" />
+              <span>Get Deep Analysis</span>
+              <motion.span animate={{ x: isHovered ? 4 : 0 }} transition={{ duration: 0.2 }}>
+                <ArrowRight className="w-4 h-4" />
               </motion.span>
-            </Button>
+            </div>
           </motion.div>
         </div>
       </motion.div>
 
-      {/* Modal */}
+      {/* ── Modal ─────────────────────────────────────────────────────────── */}
       <AnimatePresence>
         {modalOpen && (
           <motion.div
@@ -186,132 +203,270 @@ export function AIInsightCard({ insight, skills = [], role = 'Professional', mat
             onClick={(e) => { if (e.target === e.currentTarget) setModalOpen(false); }}
           >
             {/* Backdrop */}
-            <div className="absolute inset-0 bg-black/80 backdrop-blur-md" />
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-black/85 backdrop-blur-xl" />
 
-            {/* Modal Panel */}
+            {/* Panel */}
             <motion.div
-              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              initial={{ opacity: 0, scale: 0.92, y: 30 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-              className="relative w-full max-w-2xl max-h-[90vh] overflow-y-auto bg-zinc-900 border border-white/10 rounded-3xl shadow-2xl"
+              exit={{ opacity: 0, scale: 0.92, y: 30 }}
+              transition={{ type: 'spring', damping: 28, stiffness: 320 }}
+              className="relative w-full max-w-2xl max-h-[92vh] overflow-hidden bg-zinc-950 border border-white/10 rounded-[2rem] shadow-2xl flex flex-col"
             >
+              {/* Gradient top accent */}
+              <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-violet-500 via-emerald-500 to-teal-500" />
+
               {/* Modal Header */}
-              <div className="sticky top-0 z-10 bg-zinc-900/95 backdrop-blur-sm border-b border-white/5 p-6 flex items-center justify-between rounded-t-3xl">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-emerald-500 flex items-center justify-center">
-                    <Brain className="w-5 h-5 text-white" />
+              <div className="relative p-6 flex items-center justify-between border-b border-white/5 flex-shrink-0">
+                <div className="absolute inset-0 bg-gradient-to-br from-violet-500/5 to-emerald-500/5" />
+                <div className="relative flex items-center gap-4">
+                  <div className="relative">
+                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-violet-500 to-emerald-500 flex items-center justify-center shadow-lg shadow-violet-500/30">
+                      <Brain className="w-6 h-6 text-white" />
+                    </div>
+                    <motion.div animate={{ scale: [1, 1.4, 1], opacity: [0.4, 0.8, 0.4] }} transition={{ duration: 2.5, repeat: Infinity }} className="absolute inset-0 rounded-2xl bg-violet-500/30 blur-lg" />
                   </div>
                   <div>
-                    <h2 className="text-xl font-bold text-white">AI Career Analysis</h2>
-                    <p className="text-xs text-emerald-400 flex items-center gap-1">
-                      <Sparkles className="w-3 h-3" /> Powered by Google Gemma
-                    </p>
+                    <h2 className="text-xl font-black text-white tracking-tight">AI Career Analysis</h2>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <Sparkles className="w-3 h-3 text-emerald-400" />
+                      <span className="text-xs text-emerald-400 font-medium">Google Gemma · Personalised for {role}</span>
+                    </div>
                   </div>
                 </div>
-                <button onClick={() => setModalOpen(false)} className="w-9 h-9 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center transition-colors">
+                <button
+                  onClick={() => setModalOpen(false)}
+                  className="relative w-9 h-9 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 flex items-center justify-center transition-all hover:scale-110 hover:border-white/20"
+                >
                   <X className="w-4 h-4 text-zinc-400" />
                 </button>
               </div>
 
-              <div className="p-6 space-y-6">
-                {/* Loading */}
-                {loading && (
-                  <div className="flex flex-col items-center justify-center py-16 gap-4">
-                    <div className="relative">
-                      <div className="w-16 h-16 border-4 border-emerald-500/20 border-t-emerald-500 rounded-full animate-spin" />
-                      <Sparkles className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-6 h-6 text-emerald-400 animate-pulse" />
+              {/* Loading State */}
+              {loading && (
+                <div className="flex-1 flex flex-col items-center justify-center py-20 gap-6">
+                  <div className="relative">
+                    {/* Outer ring */}
+                    <div className="w-24 h-24 border-4 border-violet-500/20 border-t-violet-500 rounded-full animate-spin" />
+                    {/* Inner ring */}
+                    <div className="absolute top-3 left-3 w-18 h-18 border-4 border-emerald-500/20 border-b-emerald-500 rounded-full animate-spin" style={{ width: '72px', height: '72px', animationDirection: 'reverse', animationDuration: '1.2s' }} />
+                    {/* Center icon */}
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <Brain className="w-8 h-8 text-white/80" />
                     </div>
-                    <p className="text-zinc-400 animate-pulse">Gemma AI is analyzing your profile...</p>
                   </div>
-                )}
+                  <div className="text-center space-y-2">
+                    <AnimatePresence mode="wait">
+                      <motion.p
+                        key={loadingPhrase}
+                        initial={{ opacity: 0, y: 8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -8 }}
+                        className="text-zinc-300 font-medium"
+                      >
+                        {LOADING_PHRASES[loadingPhrase]}
+                      </motion.p>
+                    </AnimatePresence>
+                    <p className="text-xs text-zinc-600">This may take 10–20 seconds</p>
+                  </div>
+                  {/* Progress dots */}
+                  <div className="flex gap-2">
+                    {[0,1,2,3,4].map(i => (
+                      <motion.div key={i} animate={{ opacity: loadingPhrase >= i ? 1 : 0.2, scale: loadingPhrase === i ? 1.3 : 1 }} transition={{ duration: 0.3 }} className="w-2 h-2 bg-emerald-500 rounded-full" />
+                    ))}
+                  </div>
+                </div>
+              )}
 
-                {/* Error */}
-                {error && !loading && (
-                  <div className="bg-red-500/10 border border-red-500/20 rounded-2xl p-4 text-red-400 text-sm text-center">{error}</div>
-                )}
-
-                {/* Gemma Insight */}
-                {gemmaInsight && !loading && (
-                  <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-5">
-
-                    {/* Summary */}
-                    <div className="bg-gradient-to-br from-violet-500/10 to-emerald-500/10 border border-white/10 rounded-2xl p-5">
-                      <p className="text-zinc-200 leading-relaxed">{gemmaInsight.summary}</p>
+              {/* Error State */}
+              {error && !loading && (
+                <div className="flex-1 flex items-center justify-center p-8">
+                  <div className="text-center space-y-4">
+                    <div className="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center mx-auto">
+                      <AlertCircle className="w-8 h-8 text-red-400" />
                     </div>
+                    <p className="text-red-400 font-medium">{error}</p>
+                    <button onClick={openModal} className="px-4 py-2 bg-white/5 rounded-xl text-sm text-zinc-400 hover:text-white hover:bg-white/10 transition-all">
+                      Try Again
+                    </button>
+                  </div>
+                </div>
+              )}
 
-                    {/* Strengths & Gaps */}
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-2xl p-4">
-                        <div className="flex items-center gap-2 mb-3">
-                          <TrendingUp className="w-4 h-4 text-emerald-400" />
-                          <h4 className="text-sm font-semibold text-emerald-400">Your Strengths</h4>
-                        </div>
-                        <ul className="space-y-2">
-                          {(gemmaInsight.strengths || []).map((s, i) => (
-                            <li key={i} className="flex items-center gap-2 text-sm text-zinc-300">
-                              <ChevronRight className="w-3 h-3 text-emerald-500 flex-shrink-0" />{s}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                      <div className="bg-amber-500/5 border border-amber-500/20 rounded-2xl p-4">
-                        <div className="flex items-center gap-2 mb-3">
-                          <Target className="w-4 h-4 text-amber-400" />
-                          <h4 className="text-sm font-semibold text-amber-400">Skill Gaps</h4>
-                        </div>
-                        <ul className="space-y-2">
-                          {(gemmaInsight.gaps || []).map((g, i) => (
-                            <li key={i} className="flex items-center gap-2 text-sm text-zinc-300">
-                              <ChevronRight className="w-3 h-3 text-amber-500 flex-shrink-0" />{g}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    </div>
+              {/* ── Content ── */}
+              {gemmaInsight && !loading && (
+                <div className="flex flex-col flex-1 overflow-hidden">
+                  {/* Section Nav Tabs */}
+                  <div className="flex gap-1 p-3 border-b border-white/5 overflow-x-auto flex-shrink-0 scrollbar-hide">
+                    {sections.map((sec) => {
+                      const Icon = sec.icon;
+                      return (
+                        <button
+                          key={sec.id}
+                          onClick={() => setActiveSection(sec.id)}
+                          className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all duration-200 ${
+                            activeSection === sec.id
+                              ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
+                              : 'text-zinc-500 hover:text-zinc-300 hover:bg-white/5'
+                          }`}
+                        >
+                          <Icon className="w-3.5 h-3.5" />
+                          {sec.label}
+                        </button>
+                      );
+                    })}
+                  </div>
 
-                    {/* Quick Wins */}
-                    <div>
-                      <div className="flex items-center gap-2 mb-3">
-                        <Zap className="w-4 h-4 text-violet-400" />
-                        <h4 className="text-sm font-semibold text-white">Quick Wins</h4>
-                      </div>
-                      <div className="space-y-3">
-                        {(gemmaInsight.quickWins || []).map((qw, i) => (
-                          <motion.div key={i} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.1 }} className="flex items-center gap-3 bg-violet-500/5 border border-violet-500/20 rounded-xl p-3">
-                            <div className="w-6 h-6 rounded-full bg-violet-500/20 flex items-center justify-center flex-shrink-0 text-xs font-bold text-violet-400">{i + 1}</div>
-                            <div className="flex-1">
-                              <p className="text-sm text-zinc-200">{qw.action}</p>
-                              <div className="flex gap-2 mt-1">
-                                <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400">{qw.impact}</span>
-                                <span className="text-xs px-2 py-0.5 rounded-full bg-zinc-700 text-zinc-400">{qw.timeframe}</span>
-                              </div>
+                  {/* Section Content */}
+                  <div className="flex-1 overflow-y-auto p-6">
+                    <AnimatePresence mode="wait">
+
+                      {/* ── Overview ── */}
+                      {activeSection === 'summary' && (
+                        <motion.div key="summary" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} transition={{ duration: 0.25 }} className="space-y-5">
+                          {/* Hero summary */}
+                          <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-violet-500/10 via-emerald-500/5 to-teal-500/10 border border-white/10 p-6">
+                            <div className="absolute top-2 right-2">
+                              <Sparkles className="w-5 h-5 text-violet-400/40" />
                             </div>
-                          </motion.div>
-                        ))}
-                      </div>
-                    </div>
+                            <p className="text-zinc-200 leading-relaxed text-base">{gemmaInsight.summary}</p>
+                          </div>
 
-                    {/* Career Path + Salary */}
-                    <div className="grid grid-cols-1 gap-4">
-                      <div className="bg-teal-500/5 border border-teal-500/20 rounded-2xl p-4">
-                        <div className="flex items-center gap-2 mb-2">
-                          <TrendingUp className="w-4 h-4 text-teal-400" />
-                          <h4 className="text-sm font-semibold text-teal-400">Career Path</h4>
-                        </div>
-                        <p className="text-sm text-zinc-300">{gemmaInsight.careerPath}</p>
-                      </div>
-                      <div className="bg-amber-500/5 border border-amber-500/20 rounded-2xl p-4">
-                        <div className="flex items-center gap-2 mb-2">
-                          <IndianRupee className="w-4 h-4 text-amber-400" />
-                          <h4 className="text-sm font-semibold text-amber-400">Salary Insight</h4>
-                        </div>
-                        <p className="text-sm text-zinc-300">{gemmaInsight.salaryInsight}</p>
-                      </div>
-                    </div>
-                  </motion.div>
-                )}
-              </div>
+                          {/* Mini stat cards */}
+                          <div className="grid grid-cols-2 gap-3">
+                            <div className="bg-emerald-500/5 border border-emerald-500/15 rounded-2xl p-4 text-center">
+                              <div className="text-2xl font-black text-emerald-400 mb-1">{(gemmaInsight.strengths || []).length}</div>
+                              <div className="text-xs text-zinc-500 uppercase tracking-wider">Key Strengths</div>
+                            </div>
+                            <div className="bg-amber-500/5 border border-amber-500/15 rounded-2xl p-4 text-center">
+                              <div className="text-2xl font-black text-amber-400 mb-1">{(gemmaInsight.gaps || []).length}</div>
+                              <div className="text-xs text-zinc-500 uppercase tracking-wider">Skill Gaps</div>
+                            </div>
+                            <div className="bg-violet-500/5 border border-violet-500/15 rounded-2xl p-4 text-center">
+                              <div className="text-2xl font-black text-violet-400 mb-1">{(gemmaInsight.quickWins || []).length}</div>
+                              <div className="text-xs text-zinc-500 uppercase tracking-wider">Quick Wins</div>
+                            </div>
+                            <div className="bg-teal-500/5 border border-teal-500/15 rounded-2xl p-4 text-center">
+                              <div className="text-2xl font-black text-teal-400 mb-1">{matchScore}%</div>
+                              <div className="text-xs text-zinc-500 uppercase tracking-wider">Job Match</div>
+                            </div>
+                          </div>
+
+                          {/* Navigate prompt */}
+                          <p className="text-center text-xs text-zinc-600">Explore each section using the tabs above ↑</p>
+                        </motion.div>
+                      )}
+
+                      {/* ── Strengths ── */}
+                      {activeSection === 'strengths' && (
+                        <motion.div key="strengths" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} transition={{ duration: 0.25 }} className="space-y-3">
+                          <p className="text-sm text-zinc-500 mb-4">What makes you stand out from the competition</p>
+                          {(gemmaInsight.strengths || []).map((s, i) => (
+                            <motion.div key={i} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.07 }} className="flex items-start gap-4 p-4 bg-emerald-500/5 border border-emerald-500/15 rounded-2xl group hover:border-emerald-500/30 hover:bg-emerald-500/10 transition-all duration-200">
+                              <div className="w-8 h-8 rounded-xl bg-emerald-500/20 flex items-center justify-center flex-shrink-0">
+                                <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                              </div>
+                              <div className="flex-1">
+                                <p className="text-zinc-200 text-sm font-medium">{s}</p>
+                              </div>
+                              <div className="flex-shrink-0 w-6 h-6 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-xs font-bold text-emerald-400">
+                                {i + 1}
+                              </div>
+                            </motion.div>
+                          ))}
+                        </motion.div>
+                      )}
+
+                      {/* ── Skill Gaps ── */}
+                      {activeSection === 'gaps' && (
+                        <motion.div key="gaps" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} transition={{ duration: 0.25 }} className="space-y-3">
+                          <p className="text-sm text-zinc-500 mb-4">Skills to acquire for higher job match scores</p>
+                          {(gemmaInsight.gaps || []).map((g, i) => (
+                            <motion.div key={i} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.07 }} className="flex items-start gap-4 p-4 bg-amber-500/5 border border-amber-500/15 rounded-2xl hover:border-amber-500/30 hover:bg-amber-500/10 transition-all duration-200">
+                              <div className="w-8 h-8 rounded-xl bg-amber-500/20 flex items-center justify-center flex-shrink-0">
+                                <Target className="w-4 h-4 text-amber-400" />
+                              </div>
+                              <p className="text-zinc-200 text-sm font-medium flex-1">{g}</p>
+                              <span className="flex-shrink-0 text-xs px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-500 font-semibold">Gap</span>
+                            </motion.div>
+                          ))}
+                        </motion.div>
+                      )}
+
+                      {/* ── Quick Wins ── */}
+                      {activeSection === 'quickwins' && (
+                        <motion.div key="quickwins" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} transition={{ duration: 0.25 }} className="space-y-4">
+                          <p className="text-sm text-zinc-500 mb-4">High-impact actions you can take right now</p>
+                          {(gemmaInsight.quickWins || []).map((qw, i) => (
+                            <motion.div key={i} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.1 }} className="relative overflow-hidden bg-violet-500/5 border border-violet-500/15 rounded-2xl p-5 hover:border-violet-500/30 hover:bg-violet-500/8 transition-all duration-200 group">
+                              {/* Step number accent */}
+                              <div className="absolute top-0 left-0 w-1 h-full bg-gradient-to-b from-violet-500 to-violet-500/0 rounded-l-2xl" />
+                              <div className="flex items-start gap-4">
+                                <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-violet-500/30 to-violet-600/20 flex items-center justify-center flex-shrink-0 text-sm font-black text-violet-300">
+                                  {i + 1}
+                                </div>
+                                <div className="flex-1">
+                                  <p className="text-white font-semibold text-sm mb-3">{qw.action}</p>
+                                  <div className="flex flex-wrap gap-2">
+                                    <span className="flex items-center gap-1 text-xs px-2.5 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/25 text-emerald-400 font-semibold">
+                                      <TrendingUp className="w-3 h-3" />{qw.impact}
+                                    </span>
+                                    <span className="flex items-center gap-1 text-xs px-2.5 py-1 rounded-full bg-zinc-800 border border-white/10 text-zinc-400">
+                                      <Clock className="w-3 h-3" />{qw.timeframe}
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+                            </motion.div>
+                          ))}
+                        </motion.div>
+                      )}
+
+                      {/* ── Career & Salary ── */}
+                      {activeSection === 'career' && (
+                        <motion.div key="career" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} transition={{ duration: 0.25 }} className="space-y-4">
+                          {/* Career Path */}
+                          <div className="relative overflow-hidden bg-teal-500/5 border border-teal-500/20 rounded-2xl p-6">
+                            <div className="absolute top-0 right-0 w-24 h-24 bg-teal-500/10 rounded-full blur-2xl" />
+                            <div className="relative">
+                              <div className="flex items-center gap-2 mb-3">
+                                <div className="w-8 h-8 rounded-xl bg-teal-500/20 flex items-center justify-center">
+                                  <Rocket className="w-4 h-4 text-teal-400" />
+                                </div>
+                                <h4 className="font-bold text-teal-400">Your Career Path</h4>
+                              </div>
+                              <p className="text-zinc-300 leading-relaxed">{gemmaInsight.careerPath}</p>
+                            </div>
+                          </div>
+
+                          {/* Salary Insight */}
+                          <div className="relative overflow-hidden bg-amber-500/5 border border-amber-500/20 rounded-2xl p-6">
+                            <div className="absolute top-0 right-0 w-24 h-24 bg-amber-500/10 rounded-full blur-2xl" />
+                            <div className="relative">
+                              <div className="flex items-center gap-2 mb-3">
+                                <div className="w-8 h-8 rounded-xl bg-amber-500/20 flex items-center justify-center">
+                                  <IndianRupee className="w-4 h-4 text-amber-400" />
+                                </div>
+                                <h4 className="font-bold text-amber-400">Salary Intelligence</h4>
+                              </div>
+                              <p className="text-zinc-300 leading-relaxed">{gemmaInsight.salaryInsight}</p>
+                            </div>
+                          </div>
+
+                          {/* Refresh button */}
+                          <button
+                            onClick={() => { setGemmaInsight(null); openModal(); }}
+                            className="w-full py-3 rounded-2xl border border-white/10 text-zinc-500 hover:text-white hover:border-white/20 hover:bg-white/5 transition-all text-sm font-medium flex items-center justify-center gap-2"
+                          >
+                            <Sparkles className="w-4 h-4" /> Regenerate Analysis
+                          </button>
+                        </motion.div>
+                      )}
+
+                    </AnimatePresence>
+                  </div>
+                </div>
+              )}
             </motion.div>
           </motion.div>
         )}
