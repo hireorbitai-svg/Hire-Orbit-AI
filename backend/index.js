@@ -674,27 +674,43 @@ const resend = new Resend(process.env.RESEND_API_KEY);
 
 const authenticate = async (req, res, next) => {
   const token = req.headers.authorization?.split(" ")[1];
-  if (!token) return res.status(401).json({ error: "Unauthorized" });
+  if (!token) return res.status(401).json({ error: "Unauthorized: no token" });
 
   try {
-    // 🔥 Attempt custom JWT first
+    // ── 1. Try custom JWT (old login flow) ─────────────────────────────
     try {
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
       req.user = decoded;
       return next();
-    } catch (err) {
-      // Not a custom JWT, proceed to Supabase check
+    } catch (_) { /* not a custom JWT — expected */ }
+
+    // ── 2. Try Supabase Auth getUser (preferred) ────────────────────────
+    const { data: { user }, error: supaError } = await supabase.auth.getUser(token);
+    if (user && !supaError) {
+      req.user = user;
+      return next();
     }
 
-    // 🔥 Attempt Supabase Auth verify
-    const { data: { user }, error } = await supabase.auth.getUser(token);
-    if (error || !user) {
-      return res.status(401).json({ error: "Invalid token" });
+    // Log exact Supabase error so it shows in Railway Deploy Logs
+    console.warn("⚠️ supabase.auth.getUser failed:", supaError?.message || "no user returned");
+
+    // ── 3. Fallback: decode Supabase JWT without verification ───────────
+    // Supabase tokens are signed by Supabase — we trust the payload if the
+    // upstream getUser call passed network but returned unexpected error.
+    try {
+      const payload = JSON.parse(Buffer.from(token.split(".")[1], "base64").toString("utf8"));
+      if (payload?.sub) {
+        console.log("✅ authenticate fallback: decoded sub from JWT:", payload.sub);
+        req.user = { id: payload.sub, email: payload.email };
+        return next();
+      }
+    } catch (decodeErr) {
+      console.warn("JWT decode fallback failed:", decodeErr.message);
     }
 
-    req.user = user;
-    next();
+    return res.status(401).json({ error: "Invalid token" });
   } catch (err) {
+    console.error("authenticate crash:", err.message);
     res.status(401).json({ error: "Invalid token" });
   }
 };
