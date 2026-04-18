@@ -584,49 +584,60 @@ async function calculateMatchWithAI(resumeData, jobDescription) {
 
 
 
-// 🔥 Adzuna Helper Function
+// 🔥 Supabase Indexed Jobs Helper
 async function fetchAndMatchAdzunaJobs(resumeData, country = "in") {
   try {
-    const response = await axios.get(
-      `https://api.adzuna.com/v1/api/jobs/${country}/search/1`,
-      {
-        params: {
-          app_id: process.env.ADZUNA_APP_ID,
-          app_key: process.env.ADZUNA_APP_KEY,
-          results_per_page: 10,
-          what: resumeData.role
-        }
-      }
-    );
-
-    const jobs = response.data.results || [];
-    const matchedJobs = matchJobs(resumeData.skills || [], jobs);
+    const roleKeyword = (resumeData.role || "Developer").split(" ")[0];
     
-    return matchedJobs.map(job => ({
+    // 1. Fetch pre-filtered jobs from Supabase using ILIKE
+    const { data: jobs, error } = await supabase
+      .from('jobs')
+      .select('*')
+      .ilike('title', `%${roleKeyword}%`)
+      .order('created_at', { ascending: false })
+      .limit(50);
+      
+    if (error) {
+      console.error("Supabase jobs fetch error:", error);
+      return [];
+    }
+
+    // 2. Fallback to general jobs if none found for specific role
+    let finalJobs = jobs || [];
+    if (finalJobs.length === 0) {
+      const { data: fallbackJobs } = await supabase
+        .from('jobs')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(20);
+      finalJobs = fallbackJobs || [];
+    }
+    
+    // 3. Match against resume skills properly
+    const matchedJobs = matchJobs(resumeData.skills || [], finalJobs);
+    
+    // 4. Format into our canonical shape
+    const formattedJobs = matchedJobs.map(job => ({
       ...job,
-      id: job.id || job.adref || Math.random().toString(36).substr(2, 9),
-      title: job.title || job.job_title,
-      company: job.company?.display_name || job.employer_name || "Unknown",
-      location: job.location?.display_name || (job.job_city ? `${job.job_city}, ${job.job_country}` : "Remote"),
-      score: job.match,
-      matchScore: job.match, // Consistency
-      matchedSkills: job.matchedSkills,
-      missingSkills: job.missingSkills,
-      redirect_url: job.redirect_url || job.job_apply_link,
-      salary: job.salary || (job.job_salary_currency ? `${job.job_min_salary || ''} - ${job.job_max_salary || ''} ${job.job_salary_currency}` : "$70k - $120k"),
-      postedAt: job.postedAt || (job.job_posted_at_datetime_utc ? new Date(job.job_posted_at_datetime_utc).toLocaleDateString() : "New")
+      id: job.id,
+      title: job.title,
+      company: job.company || "Unknown",
+      location: job.location || "Remote",
+      score: job.match || job.score || 0,
+      matchScore: job.match || job.score || 0,
+      matchedSkills: job.matchedSkills || [],
+      missingSkills: job.missingSkills || [],
+      redirect_url: job.redirect_url,
+      salary: job.salary || "$70k - $120k",
+      postedAt: job.posted_at || job.postedAt || "New"
     }));
 
-    const filteredJobs = matchedJobs
+    const filteredJobs = formattedJobs
       .filter(job => job.score > 0)
       .sort((a, b) => b.score - a.score)
       .slice(0, 5);
 
     if (filteredJobs.length === 0) {
-      const searchRole = encodeURIComponent(resumeData.role || "Software Specialist");
-      const fallbackUrl = `https://www.adzuna.in/jobs/search?q=${searchRole}`;
-      
-      console.log("⚠️ No Adzuna results. Generating role-based simulated opportunities.");
       return [
         {
           id: "simulated-1",
@@ -636,28 +647,14 @@ async function fetchAndMatchAdzunaJobs(resumeData, country = "in") {
           score: 85,
           matchedSkills: resumeData.skills.slice(0, 3),
           missingSkills: ["System Design", "Cloud Infrastructure"],
-          redirect_url: fallbackUrl,
-          company_url: fallbackUrl,
-          apply_url: fallbackUrl
-        },
-        {
-          id: "simulated-2",
-          title: `Associate ${resumeData.role || "Professional"}`,
-          company: "TechNexus India",
-          location: "Mumbai, India",
-          score: 72,
-          matchedSkills: resumeData.skills.slice(0, 2),
-          missingSkills: ["Advanced Analytics"],
-          redirect_url: fallbackUrl,
-          company_url: fallbackUrl,
-          apply_url: fallbackUrl
+          redirect_url: `https://www.adzuna.in/jobs/search?q=${encodeURIComponent(resumeData.role || "Software Specialist")}`
         }
       ];
     }
 
     return filteredJobs;
   } catch (err) {
-    console.error("Adzuna API Fetch Error:", err.message);
+    console.error("Supabase Match Error:", err.message);
     return [];
   }
 }
@@ -1600,6 +1597,90 @@ process.on("uncaughtException", (err) => {
 process.on("unhandledRejection", (reason) => {
   console.error("💥 UNHANDLED REJECTION:", reason);
   // Don't exit — keep server running
+});
+
+// ⚡ CRON Endpoint to fetch and store Adzuna Jobs daily
+const cronLimiter = rateLimit({ windowMs: 60 * 60 * 1000, max: 1, message: "Too many cron requests" });
+app.post("/api/fetch-jobs", cronLimiter, async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    const cronSecret = process.env.CRON_SECRET;
+    
+    if (!authHeader || authHeader !== `Bearer ${cronSecret}`) {
+      return res.status(401).json({ error: "Unauthorized cron access" });
+    }
+
+    // Keyword Rotation Strategy based on Day of Year
+    const baseKeywords = [
+      "Software Developer", "Data Analyst", "Marketing", 
+      "Designer", "Sales", "Business Analyst", 
+      "Frontend Developer", "Backend Developer", "Full Stack Developer",
+      "Intern", "Remote", "Fresher"
+    ];
+    
+    const startOfYear = new Date(new Date().getFullYear(), 0, 0);
+    const diff = Date.now() - startOfYear.getTime();
+    const dayOfYear = Math.floor(diff / (1000 * 60 * 60 * 24));
+    
+    // Pick 3 rotating keywords per day to fetch
+    const todayKeywords = [
+      baseKeywords[dayOfYear % baseKeywords.length],
+      baseKeywords[(dayOfYear + 1) % baseKeywords.length],
+      baseKeywords[(dayOfYear + 2) % baseKeywords.length],
+    ];
+
+    console.log(`[Job Cron] Fetching today's keywords: ${todayKeywords.join(", ")}`);
+    
+    let allFetchedJobs = [];
+    
+    for (const kw of todayKeywords) {
+      const response = await axios.get(`https://api.adzuna.com/v1/api/jobs/in/search/1`, {
+        params: {
+          app_id: process.env.ADZUNA_APP_ID,
+          app_key: process.env.ADZUNA_APP_KEY,
+          results_per_page: 50,
+          what: kw
+        }
+      });
+      
+      const jobs = response.data.results || [];
+      const mappedJobs = jobs.map(j => ({
+        id: String(j.id || j.adref || Math.random().toString(36).substr(2, 9)),
+        title: j.title || j.job_title || "Unknown Title",
+        company: j.company?.display_name || j.employer_name || "Unknown Company",
+        location: j.location?.display_name || "Remote",
+        description: j.description || "",
+        redirect_url: j.redirect_url || j.job_apply_link || "",
+        salary: String(j.salary_max || j.salary_min ? `${j.salary_min || ''} - ${j.salary_max || ''}` : "Competitive"),
+        posted_at: String(j.created || new Date().toISOString()),
+        type: String(j.contract_type || "Full-time"),
+        source: "Adzuna"
+      }));
+      allFetchedJobs.push(...mappedJobs);
+    }
+    
+    // Upsert into Supabase
+    if (allFetchedJobs.length > 0) {
+      const { error } = await supabase.from('jobs').upsert(allFetchedJobs, { onConflict: 'id' });
+      if (error) console.error("[Job Cron] Supabase UPSERT Error:", error);
+    }
+    
+    // Cleanup old jobs (older than 14 days)
+    const fourteenDaysAgo = new Date();
+    fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 14);
+    
+    const { error: deleteError } = await supabase
+      .from('jobs')
+      .delete()
+      .lt('created_at', fourteenDaysAgo.toISOString());
+      
+    if (deleteError) console.error("[Job Cron] Supabase Cleanup Error:", deleteError);
+
+    res.json({ success: true, stored: allFetchedJobs.length, keywords: todayKeywords });
+  } catch (err) {
+    console.error("Cron Job Fetch Error:", err.message);
+    res.status(500).json({ error: "Job fetch failed" });
+  }
 });
 
 // Health check endpoint (Railway uses this)

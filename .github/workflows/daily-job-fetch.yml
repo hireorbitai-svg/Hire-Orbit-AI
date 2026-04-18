@@ -1,0 +1,20 @@
+name: Daily Job Fetcher
+
+on:
+  schedule:
+    # Runs at 20:30 UTC daily (02:00 AM IST)
+    - cron: '30 20 * * *'
+  # Allow manual trigger from GitHub Actions tab
+  workflow_dispatch:
+
+jobs:
+  fetch-jobs:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Hit CRON Endpoint
+        run: |
+          curl -X POST "https://api.hireorbitai.in/api/fetch-jobs" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            -H "Content-Type: application/json" \
+            --fail || exit 1
+        # The `--fail` command ensures the action fails if the server responds with a 4xx or 5xx code.
