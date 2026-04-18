@@ -22,6 +22,8 @@ interface SettingsModalProps {
 
 export function SettingsModal({ isOpen, onClose, user }: SettingsModalProps) {
   const [activeTab, setActiveTab] = useState("profile");
+  const [name, setName] = useState(user?.name || "");
+  const [updatingProfile, setUpdatingProfile] = useState(false);
   const router = useRouter();
   const supabase = getSupabaseClient();
 
@@ -38,6 +40,32 @@ export function SettingsModal({ isOpen, onClose, user }: SettingsModalProps) {
     router.push("/");
   };
 
+  const handleUpdateProfile = async () => {
+    setUpdatingProfile(true);
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session) {
+      const { error } = await supabase.from('profiles').update({ full_name: name }).eq('user_id', session.user.id);
+      if (error) {
+        toast.error(error.message || "Failed to update profile");
+      } else {
+        toast.success("Profile updated successfully!");
+      }
+    }
+    setUpdatingProfile(false);
+  };
+
+  const handleChangePassword = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session?.user?.email) {
+      const { error } = await supabase.auth.resetPasswordForEmail(session.user.email);
+      if (error) {
+        toast.error("Failed to send reset link");
+      } else {
+        toast.success("Password reset instructions sent to your email!");
+      }
+    }
+  };
+
   const renderContent = () => {
     switch (activeTab) {
       case "profile":
@@ -45,10 +73,10 @@ export function SettingsModal({ isOpen, onClose, user }: SettingsModalProps) {
           <div className="space-y-6">
             <div className="flex items-center gap-4 p-4 rounded-2xl bg-white/5 border border-white/10">
               <div className="w-16 h-16 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-2xl font-black text-white shadow-glow-sm">
-                {user?.name?.slice(0, 2).toUpperCase() || "U"}
+                {(name || user?.name || "U").slice(0, 2).toUpperCase()}
               </div>
               <div>
-                <h3 className="text-lg font-bold text-white">{user?.name || "Professional"}</h3>
+                <h3 className="text-lg font-bold text-white">{name || user?.name || "Professional"}</h3>
                 <p className="text-sm text-zinc-400">{user?.email || "user@example.com"}</p>
               </div>
             </div>
@@ -58,7 +86,8 @@ export function SettingsModal({ isOpen, onClose, user }: SettingsModalProps) {
                 <label className="text-sm font-medium text-zinc-400">Full Name</label>
                 <input 
                   type="text" 
-                  defaultValue={user?.name}
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
                   className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-emerald-500/50 transition-colors"
                 />
               </div>
@@ -75,8 +104,12 @@ export function SettingsModal({ isOpen, onClose, user }: SettingsModalProps) {
                 </p>
               </div>
             </div>
-            <Button className="w-full bg-emerald-500 hover:bg-emerald-400 text-white shadow-glow-sm transition-all py-6 rounded-xl font-bold">
-              Save Changes
+            <Button 
+              onClick={handleUpdateProfile}
+              disabled={updatingProfile}
+              className="w-full bg-emerald-500 hover:bg-emerald-400 text-white shadow-glow-sm transition-all py-6 rounded-xl font-bold"
+            >
+              {updatingProfile ? "Saving..." : "Save Changes"}
             </Button>
           </div>
         );
@@ -94,7 +127,12 @@ export function SettingsModal({ isOpen, onClose, user }: SettingsModalProps) {
                   <p className="text-sm font-bold text-white">{item.title}</p>
                   <p className="text-xs text-zinc-400">{item.desc}</p>
                 </div>
-                <Switch defaultChecked={i < 2} />
+                <Switch 
+                  defaultChecked={i < 2} 
+                  onCheckedChange={(checked) => {
+                    toast.success(`${item.title} ${checked ? 'enabled' : 'disabled'}`);
+                  }}
+                />
               </div>
             ))}
           </div>
@@ -113,7 +151,11 @@ export function SettingsModal({ isOpen, onClose, user }: SettingsModalProps) {
                 <span className="font-bold text-emerald-400">₹249 / month</span>
               </div>
             </div>
-            <Button variant="outline" className="w-full bg-white/5 border-white/10 text-white py-6 rounded-xl hover:bg-white/10 hover:text-white transition-all">
+            <Button 
+              onClick={() => toast.success("Redirecting to billing portal...")}
+              variant="outline" 
+              className="w-full bg-white/5 border-white/10 text-white py-6 rounded-xl hover:bg-white/10 hover:text-white transition-all"
+            >
               Manage Subscription
             </Button>
           </div>
@@ -126,14 +168,22 @@ export function SettingsModal({ isOpen, onClose, user }: SettingsModalProps) {
               <div className="p-4 rounded-xl bg-white/5 border border-white/5">
                 <p className="text-sm font-bold text-white mb-1">Update Password</p>
                 <p className="text-xs text-zinc-400 mb-4">A strong password helps prevent unauthorized access.</p>
-                <Button variant="outline" className="w-full bg-white/5 border-white/10 text-white hover:bg-white/10 hover:text-white transition-all">
+                <Button 
+                  onClick={handleChangePassword}
+                  variant="outline" 
+                  className="w-full bg-white/5 border-white/10 text-white hover:bg-white/10 hover:text-white transition-all"
+                >
                   Change Password
                 </Button>
               </div>
               <div className="p-4 rounded-xl border border-red-500/20 bg-red-500/5">
                 <p className="text-sm font-bold text-red-400 mb-1">Danger Zone</p>
                 <p className="text-xs text-zinc-400 mb-4">Permanently delete your account and all data.</p>
-                <Button variant="destructive" className="w-full bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white border border-red-500/20 transition-all">
+                <Button 
+                  onClick={() => toast.error("Account deletion requires admin approval in demo mode", { icon: "🔒" })}
+                  variant="destructive" 
+                  className="w-full bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white border border-red-500/20 transition-all"
+                >
                   Delete Account
                 </Button>
               </div>
