@@ -1,7 +1,9 @@
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { ArrowRight, Play, Sparkles, Zap, TrendingUp, Bell, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
+import { getSupabaseClient } from '@/lib/supabase';
 
 // Animated Dashboard Preview Component
 function DashboardPreview() {
@@ -139,6 +141,39 @@ function DashboardPreview() {
 }
 
 export function Hero() {
+  const [session, setSession] = useState(null);
+  const [hasResume, setHasResume] = useState(false);
+  const supabase = getSupabaseClient();
+
+  useEffect(() => {
+    const checkAuth = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      setSession(session);
+      if (session) {
+        const { data: profileData } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('user_id', session.user.id)
+          .single();
+        
+        const uploaded = profileData?.resume_url || (profileData?.skills && profileData?.skills.length > 0) || (profileData?.role && profileData?.role !== "Unknown");
+        setHasResume(uploaded);
+      }
+    };
+    checkAuth();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+      if (!session) {
+        setHasResume(false);
+      } else {
+        checkAuth();
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, [supabase]);
+
   return (
     <section className="relative min-h-screen flex items-center pt-20 overflow-hidden">
       {/* Background Effects */}
@@ -207,8 +242,8 @@ export function Hero() {
                 size="lg"
                 className="bg-emerald-500 hover:bg-emerald-400 text-white text-lg px-8 py-6 rounded-xl shadow-glow hover:shadow-glow-lg transition-all group"
               >
-                <Link href="/onboarding">
-                  Get Started Free
+                <Link href={session ? (hasResume ? "/dashboard" : "/onboarding") : "/signup"}>
+                  {session ? (hasResume ? "Go to Dashboard" : "Upload Resume") : "Get Started Free"}
                   <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
                 </Link>
               </Button>

@@ -75,7 +75,25 @@ export default function Onboarding() {
         } else {
           setUserId(session.user.id);
           setToken(session.access_token);
-          setLoading(false);
+
+          // Check if user already has a resume
+          const { data: profileData } = await supabase
+            .from("profiles")
+            .select("*")
+            .eq("user_id", session.user.id)
+            .single();
+
+          const hasUploadedResume =
+            profileData?.resume_url ||
+            (profileData?.skills && profileData?.skills.length > 0) ||
+            (profileData?.role && profileData?.role !== "Unknown");
+
+          if (hasUploadedResume) {
+            console.log("🚀 Resume already Found → Redirecting to Dashboard");
+            router.replace("/dashboard");
+          } else {
+            setLoading(false);
+          }
         }
       } catch (err) {
         console.error("Auth check error:", err);

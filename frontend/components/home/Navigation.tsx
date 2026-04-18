@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Menu, X, Orbit, ChevronRight } from 'lucide-react';
+import { Menu, X, Orbit, ChevronRight, User, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
+import { getSupabaseClient } from '@/lib/supabase';
+import { useRouter } from 'next/navigation';
 
 const navLinks = [
   { label: 'Features', href: '#features' },
@@ -14,6 +16,10 @@ const navLinks = [
 export function Navigation() {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [session, setSession] = useState(null);
+  const [hasResume, setHasResume] = useState(false);
+  const router = useRouter();
+  const supabase = getSupabaseClient();
 
   useEffect(() => {
     const handleScroll = () => {
@@ -22,6 +28,42 @@ export function Navigation() {
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
+
+  useEffect(() => {
+    const checkAuth = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      setSession(session);
+      if (session) {
+        const { data: profileData } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('user_id', session.user.id)
+          .single();
+        
+        const uploaded = profileData?.resume_url || (profileData?.skills && profileData?.skills.length > 0) || (profileData?.role && profileData?.role !== "Unknown");
+        setHasResume(uploaded);
+      }
+    };
+    checkAuth();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+      if (!session) {
+        setHasResume(false);
+      } else {
+        checkAuth();
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, [supabase]);
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    setSession(null);
+    setHasResume(false);
+    router.push('/');
+  };
 
   return (
     <>
@@ -74,31 +116,64 @@ export function Navigation() {
 
             {/* CTA Buttons */}
             <div className="hidden lg:flex items-center gap-3">
-              <motion.div
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.4 }}
-              >
-                <Button
-                  asChild
-                  variant="ghost"
-                  className="text-zinc-400 hover:text-white hover:bg-white/5"
-                >
-                  <Link href="/login">Sign In</Link>
-                </Button>
-              </motion.div>
-              <motion.div
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.5 }}
-              >
-                <Button asChild className="bg-emerald-500 hover:bg-emerald-400 text-white shadow-glow-sm hover:shadow-glow transition-all">
-                  <Link href="/signup">
-                    Get Started
-                    <ChevronRight className="w-4 h-4 ml-1" />
-                  </Link>
-                </Button>
-              </motion.div>
+              {session ? (
+                <>
+                  <motion.div
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 0.4 }}
+                  >
+                    <Button
+                      variant="ghost"
+                      onClick={handleSignOut}
+                      className="text-zinc-400 hover:text-white hover:bg-white/5"
+                    >
+                      <LogOut className="w-4 h-4 mr-2" />
+                      Sign Out
+                    </Button>
+                  </motion.div>
+                  <motion.div
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 0.5 }}
+                  >
+                    <Button asChild className="bg-emerald-500 hover:bg-emerald-400 text-white shadow-glow-sm hover:shadow-glow transition-all">
+                      <Link href={hasResume ? "/dashboard" : "/onboarding"}>
+                        {hasResume ? "Dashboard" : "Upload Resume"}
+                        <ChevronRight className="w-4 h-4 ml-1" />
+                      </Link>
+                    </Button>
+                  </motion.div>
+                </>
+              ) : (
+                <>
+                  <motion.div
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 0.4 }}
+                  >
+                    <Button
+                      asChild
+                      variant="ghost"
+                      className="text-zinc-400 hover:text-white hover:bg-white/5"
+                    >
+                      <Link href="/login">Sign In</Link>
+                    </Button>
+                  </motion.div>
+                  <motion.div
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 0.5 }}
+                  >
+                    <Button asChild className="bg-emerald-500 hover:bg-emerald-400 text-white shadow-glow-sm hover:shadow-glow transition-all">
+                      <Link href="/signup">
+                        Get Started
+                        <ChevronRight className="w-4 h-4 ml-1" />
+                      </Link>
+                    </Button>
+                  </motion.div>
+                </>
+              )}
             </div>
 
             {/* Mobile Menu Button */}
@@ -135,16 +210,39 @@ export function Navigation() {
                 ))}
               </nav>
               <div className="mt-4 pt-4 border-t border-white/5 space-y-2">
-                <Button
-                  asChild
-                  variant="outline"
-                  className="w-full bg-white/5 border-white/10 text-zinc-300"
-                >
-                  <Link href="/login">Sign In</Link>
-                </Button>
-                <Button asChild className="w-full bg-emerald-500 hover:bg-emerald-400 text-white">
-                  <Link href="/signup">Get Started Free</Link>
-                </Button>
+                {session ? (
+                  <>
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        handleSignOut();
+                        setIsMobileMenuOpen(false);
+                      }}
+                      className="w-full bg-white/5 border-white/10 text-zinc-300"
+                    >
+                      <LogOut className="w-4 h-4 mr-2" />
+                      Sign Out
+                    </Button>
+                    <Button asChild className="w-full bg-emerald-500 hover:bg-emerald-400 text-white">
+                      <Link href={hasResume ? "/dashboard" : "/onboarding"} onClick={() => setIsMobileMenuOpen(false)}>
+                        {hasResume ? "Dashboard" : "Upload Resume"}
+                      </Link>
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <Button
+                      asChild
+                      variant="outline"
+                      className="w-full bg-white/5 border-white/10 text-zinc-300"
+                    >
+                      <Link href="/login" onClick={() => setIsMobileMenuOpen(false)}>Sign In</Link>
+                    </Button>
+                    <Button asChild className="w-full bg-emerald-500 hover:bg-emerald-400 text-white">
+                      <Link href="/signup" onClick={() => setIsMobileMenuOpen(false)}>Get Started Free</Link>
+                    </Button>
+                  </>
+                )}
               </div>
             </div>
           </motion.div>
