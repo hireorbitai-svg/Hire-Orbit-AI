@@ -14,24 +14,25 @@ export default function ForgotPassword() {
   const router = useRouter();
 
   const handleReset = async () => {
+    if (!email) {
+      alert("Please enter your email address.");
+      return;
+    }
     setLoading(true);
 
     try {
-      const res = await fetch("http://localhost:5001/api/auth/request-reset", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
+      const redirectTo = `${window.location.origin}/reset-password`;
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo,
       });
 
-      const data = await res.json();
-
-      if (data.success) {
-        setSent(true);
+      if (error) {
+        alert(error.message || "Failed to send reset link");
       } else {
-        alert(data.error || "Failed to send reset link");
+        setSent(true);
       }
     } catch (err) {
-      alert("Error connecting to security server");
+      alert("An unexpected error occurred. Please try again.");
     } finally {
       setLoading(false);
     }

@@ -52,8 +52,8 @@ export default function Signup() {
         ], { onConflict: 'user_id' });
       }
       
-      toast.success("🎉 Account created! Please check your email to confirm.")
-      setTimeout(() => router.push("/login"), 2000)
+      toast.success("🎉 Account created! Welcome to HireOrbitAi.")
+      setTimeout(() => router.push("/dashboard"), 1000)
     }
   }
 

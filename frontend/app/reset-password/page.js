@@ -1,14 +1,14 @@
 "use client"
 
 import { useState, useEffect, Suspense } from "react"
-import { useSearchParams, useRouter } from "next/navigation"
-import { motion, AnimatePresence } from "framer-motion"
-import { Lock, Sparkles, CheckCircle2, AlertCircle, ArrowLeft, KeyRound } from "lucide-react"
+import { useRouter } from "next/navigation"
+import { motion } from "framer-motion"
+import { Lock, CheckCircle2, AlertCircle, ArrowLeft, KeyRound } from "lucide-react"
+import { getSupabaseClient } from "@/lib/supabase"
 
 function ResetPasswordForm() {
-  const params = useSearchParams()
   const router = useRouter()
-  const token = params.get("token")
+  const supabase = getSupabaseClient()
 
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
@@ -17,76 +17,53 @@ function ResetPasswordForm() {
   const [valid, setValid] = useState(false)
   const [error, setError] = useState("")
   const [success, setSuccess] = useState(false)
-  const [userEmail, setUserEmail] = useState("")
 
-  // 1. Verify token on load
+  // Supabase sends a recovery link that sets a session automatically.
+  // Listen for the PASSWORD_RECOVERY event to confirm the link is valid.
   useEffect(() => {
-    if (!token) {
-      setValidating(false)
-      setError("No reset token found. Please check your email link.")
-      return
-    }
-
-    const verifyToken = async () => {
-      try {
-        const res = await fetch(`http://localhost:5001/api/auth/verify-token?token=${token}`)
-        const data = await res.json()
-
-        if (data.success) {
-          setValid(true)
-          setUserEmail(data.email)
-        } else {
-          setError(data.error || "This link is invalid or has expired.")
-        }
-      } catch (err) {
-        setError("Unable to connect to security server.")
-      } finally {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === "PASSWORD_RECOVERY") {
+        setValid(true)
         setValidating(false)
       }
-    }
+    })
 
-    verifyToken()
-  }, [token])
+    // If user already has a session (e.g., page refreshed after clicking link)
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+        setValid(true)
+      }
+      setValidating(false)
+    })
+
+    return () => subscription.unsubscribe()
+  }, [supabase])
 
   const handleReset = async (e) => {
     e.preventDefault()
-    
+
     if (password !== confirmPassword) {
-      alert("Passwords do not match!")
+      setError("Passwords do not match!")
       return
     }
 
     if (password.length < 6) {
-      alert("Password must be at least 6 characters.")
+      setError("Password must be at least 6 characters.")
       return
     }
 
     setLoading(true)
     setError("")
 
-    try {
-      const res = await fetch("http://localhost:5001/api/auth/reset-password", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ token, password }),
-      })
+    // This updates the password in Supabase Auth directly
+    const { error } = await supabase.auth.updateUser({ password })
 
-      const data = await res.json()
-
-      if (data.success) {
-        setSuccess(true)
-        setTimeout(() => {
-          router.push("/login")
-        }, 3000)
-      } else {
-        setError(data.error || "Failed to update password.")
-        setLoading(false)
-      }
-    } catch (err) {
-      setError("Server communication error.")
+    if (error) {
+      setError(error.message || "Failed to update password.")
       setLoading(false)
+    } else {
+      setSuccess(true)
+      setTimeout(() => router.push("/login"), 3000)
     }
   }
 
@@ -94,14 +71,14 @@ function ResetPasswordForm() {
     return (
       <div className="flex flex-col items-center gap-4">
         <div className="w-12 h-12 border-4 border-emerald-500/20 border-t-emerald-500 rounded-full animate-spin" />
-        <p className="text-emerald-400 font-medium animate-pulse">Verifying security token...</p>
+        <p className="text-emerald-400 font-medium animate-pulse">Verifying reset link...</p>
       </div>
     )
   }
 
   if (!valid && !success) {
     return (
-      <motion.div 
+      <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
         className="text-center flex flex-col gap-6"
@@ -111,14 +88,16 @@ function ResetPasswordForm() {
         </div>
         <div>
           <h2 className="text-2xl font-bold text-white mb-2">Invalid Reset Link</h2>
-          <p className="text-zinc-400 max-w-xs mx-auto">{error}</p>
+          <p className="text-zinc-400 max-w-xs mx-auto">
+            This link is invalid or has expired. Please request a new one.
+          </p>
         </div>
         <button
-          onClick={() => router.push("/login")}
+          onClick={() => router.push("/forgot-password")}
           className="flex items-center justify-center gap-2 text-emerald-400 hover:text-emerald-300 font-medium transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />
-          Back to Login
+          Request New Link
         </button>
       </motion.div>
     )
@@ -126,7 +105,7 @@ function ResetPasswordForm() {
 
   if (success) {
     return (
-      <motion.div 
+      <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
         className="text-center flex flex-col gap-6"
@@ -140,7 +119,7 @@ function ResetPasswordForm() {
         </div>
         <div className="flex justify-center">
           <div className="w-48 h-1 bg-white/5 overflow-hidden rounded-full">
-            <motion.div 
+            <motion.div
               initial={{ x: "-100%" }}
               animate={{ x: "0%" }}
               transition={{ duration: 3 }}
@@ -153,7 +132,7 @@ function ResetPasswordForm() {
   }
 
   return (
-    <motion.div 
+    <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       className="flex flex-col gap-8 w-full"
@@ -163,9 +142,7 @@ function ResetPasswordForm() {
           <KeyRound className="text-emerald-400 w-6 h-6" />
         </div>
         <h1 className="text-3xl font-bold gradient-text">Create New Password</h1>
-        <p className="text-muted-foreground text-sm">
-          Resetting password for <span className="text-emerald-400 font-medium">{userEmail}</span>
-        </p>
+        <p className="text-muted-foreground text-sm">Enter your new password below</p>
       </div>
 
       <form onSubmit={handleReset} className="flex flex-col gap-6">
@@ -231,7 +208,7 @@ export default function ResetPasswordPage() {
       {/* Background Decorative Elements */}
       <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-emerald-500/10 blur-[120px] rounded-full animate-pulse-glow" />
       <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-teal-500/10 blur-[120px] rounded-full animate-pulse-glow" style={{ animationDelay: '1s' }} />
-      
+
       <div className="w-full max-w-md glass p-10 rounded-3xl shadow-glow relative z-10 mx-4">
         <Suspense fallback={
           <div className="flex flex-col items-center gap-4">
