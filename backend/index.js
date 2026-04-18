@@ -1035,28 +1035,36 @@ app.post("/upload-resume", authenticate, upload.single("resume"), async (req, re
 
     const parsed = await parseResumeWithAI(text);
     
-    // 🔥 NEW: Handle Storage Upload in Backend
+    // 🔥 Handle Storage Upload (non-blocking — analysis continues even if storage fails)
     const userId = req.user.id;
     const fileName = `${userId || "anonymous"}/${Date.now()}_${req.file.originalname}`;
     const fileBuffer = fs.readFileSync(filePath);
-    
-    const { data: uploadData, error: uploadError } = await supabase.storage
-      .from("resumes")
-      .upload(fileName, fileBuffer, {
-        contentType: req.file.mimetype,
-        upsert: true
-      });
 
-    fs.unlinkSync(filePath); // Cleanup local file
+    let publicUrl = null;
 
-    if (uploadError) {
-      console.error("Supabase Storage Error:", uploadError.message);
-      return res.status(500).json({ error: "Failed to store resume file." });
+    try {
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from("resumes")
+        .upload(fileName, fileBuffer, {
+          contentType: req.file.mimetype,
+          upsert: true
+        });
+
+      if (uploadError) {
+        // Log but don't fail — resume analysis is more important than file storage
+        console.warn("⚠️ Supabase Storage upload skipped:", uploadError.message);
+      } else {
+        const { data: { publicUrl: url } } = supabase.storage
+          .from("resumes")
+          .getPublicUrl(fileName);
+        publicUrl = url;
+        console.log("✅ Resume stored in Supabase Storage:", publicUrl);
+      }
+    } catch (storageErr) {
+      console.warn("⚠️ Storage exception (non-fatal):", storageErr.message);
     }
 
-    const { data: { publicUrl } } = supabase.storage
-      .from("resumes")
-      .getPublicUrl(fileName);
+    fs.unlinkSync(filePath); // Cleanup local temp file
 
     if (userId) {
       console.log("💾 Saving extracted profile to Supabase for User:", userId);
