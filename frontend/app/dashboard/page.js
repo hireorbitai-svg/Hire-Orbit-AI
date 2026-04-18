@@ -205,8 +205,15 @@ export default function Dashboard() {
           }
         }
 
-        // ✅ Step 5.1: GUARD - Redirect to onboarding if no resume uploaded yet
-        if (profileData && !profileData.resume_url) {
+        // ✅ Step 5.1: GUARD — Redirect to onboarding only if no resume data at all
+        // Check skills too — resume_url may be null if Supabase Storage bucket doesn't exist,
+        // but skills are ALWAYS saved after a successful resume parse.
+        const hasUploadedResume =
+          profileData?.resume_url ||
+          (profileData?.skills && profileData?.skills.length > 0) ||
+          (profileData?.role && profileData?.role !== "Unknown");
+
+        if (profileData && !hasUploadedResume) {
           console.log("🚀 No resume found → Redirecting to onboarding");
           router.replace("/onboarding");
           return;
